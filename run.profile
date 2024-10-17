@@ -19,6 +19,41 @@ configure_git() {
     git config --global init.defaultBranch main
     echo "Git configured with name: $git_name and email: $git_email"
 }
+# setup gpg
+setup_gpg() {
+    echo "Setting up GPG..."
+    brew install gpg
+    brew install gh
+    
+    # Generate a new GPG key
+    gpg --batch --generate-key <<EOF
+%no-protection
+Key-Type: 1
+Key-Length: 4096
+Subkey-Type: 1
+Subkey-Length: 4096
+Name-Real: $(git config user.name)
+Name-Email: $(git config user.email)
+Expire-Date: 0
+EOF
+    
+    # Get the GPG key ID
+    gpg_key_id=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | awk -F'/' '{print $2}')
+    
+    # Configure Git to use the GPG key
+    git config --global user.signingkey $gpg_key_id
+    git config --global commit.gpgsign true
+    
+    # Export the public key
+    gpg --armor --export $gpg_key_id > gpg_public_key.txt
+    
+    # Add GPG key to GitHub using gh CLI
+    gh auth login --with-token < ~/.github_token
+    gh gpg-key add gpg_public_key.txt
+    
+    echo "GPG key generated, configured for Git signing, and added to GitHub."
+    echo "GPG setup complete."
+}
 
 configure_docker() {
     echo "Setting up Docker..."
@@ -142,6 +177,7 @@ add_aliases() {
 # Main function
 main() {
     configure_git
+    setup_gpg
     configure_docker
     setup_github
     configure_npm
